@@ -121,7 +121,17 @@ Run from:
 Command:
 
 ```bash
+source .venv/bin/activate
+alembic upgrade head
+python scripts/check_db_connection.py
 uvicorn app.main:app --reload
+```
+
+Useful manual checks once the API is running:
+
+```bash
+curl http://localhost:8000/health
+curl http://localhost:8000/metrics/summary
 ```
 
 ## 6.3 Frontend
@@ -135,8 +145,17 @@ Run from:
 Command:
 
 ```bash
+npm install
 npm run dev
 ```
+
+Current status:
+
+- milestone 6 frontend is implemented and milestone 9 adds the manual order testing page
+- the dashboard uses TanStack Query for API state
+- charts are rendered with Recharts
+- the frontend reads `NEXT_PUBLIC_API_URL`
+- the backend must allow `CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000`
 
 ## 6.4 Ingestion and Transformation
 
@@ -153,6 +172,11 @@ python scripts/ingest_data.py
 python scripts/transform_data.py
 ```
 
+Current status:
+
+- `python scripts/ingest_data.py` is implemented in milestone 3
+- `python scripts/transform_data.py` is implemented in milestone 4
+
 ## 7. Environment Variables
 
 The project should use `.env` files.
@@ -165,6 +189,7 @@ POSTGRES_USER=datapulse
 POSTGRES_PASSWORD=datapulse
 POSTGRES_DB=datapulse
 ENVIRONMENT=local
+CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 ```
 
 Frontend `.env.local` example:
@@ -187,6 +212,10 @@ datapulse-bi/
 ├── docker-compose.yml
 ├── frontend/
 ├── backend/
+│   ├── alembic/
+│   ├── app/
+│   ├── scripts/
+│   └── tests/
 ├── data/
 └── docs/
 ```
@@ -199,11 +228,13 @@ Daily development flow:
 2. Go to the project folder.
 3. Start Docker services.
 4. Activate Python virtual environment.
-5. Start backend.
-6. Start frontend.
-7. Run ingestion or transformation when needed.
-8. Test changes.
-9. Commit progress.
+5. Apply migrations when the schema changes.
+6. Run the database connectivity check when needed.
+7. Start backend.
+8. Run ingestion when sample raw data needs to be loaded or duplicate detection needs to be checked.
+9. Run transformation when the analytical tables need to be rebuilt from newly ingested raw data.
+10. Test changes.
+11. Commit progress.
 
 Example:
 
@@ -213,15 +244,23 @@ docker compose up -d
 
 cd backend
 source .venv/bin/activate
+alembic upgrade head
+python scripts/check_db_connection.py
 uvicorn app.main:app --reload
 ```
 
-In another terminal:
+Open a second terminal for the frontend once the backend is running:
 
 ```bash
 cd ~/projects/datapulse-bi/frontend
+npm install
 npm run dev
 ```
+
+Run `python scripts/ingest_data.py` separately when the local database is empty or when you intentionally want to verify duplicate detection behavior.
+Run `python scripts/transform_data.py` after ingestion when you want to populate `stg_orders`, dimensions, and `fact_orders`.
+Run `python scripts/run_smoke_checks.py` when you want one command to confirm that health, ingestion, transformation, and key API responses still work together.
+Run `docker compose -p datapulse-bi-prod -f docker-compose.production.yml up -d --build` when you want a production-like stack with the backend and frontend running from their Docker images.
 
 ## 10. Recommended Ports
 
@@ -230,6 +269,7 @@ npm run dev
 | Frontend | 3000 |
 | Backend | 8000 |
 | PostgreSQL | 5432 |
+| PostgreSQL production-like stack | 5433 |
 | pgAdmin optional | 5050 |
 
 ## 11. Good Practices
@@ -303,3 +343,6 @@ The local environment is ready when:
 - transformation script can generate analytics data
 - API returns metrics
 - dashboard displays metrics
+- the top navigation links `/` and `/orders/new`
+- dashboard can reach the backend from the browser without CORS errors
+- the production-like Docker stack can serve the dashboard and backend healthcheck

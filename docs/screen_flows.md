@@ -20,10 +20,26 @@ The Business Viewer can:
 - inspect recent orders
 - view ingestion status
 - understand data quality status
+- submit a manual test order through the portfolio UI
 
 No authentication is required in the MVP.
 
 ## 3. Planned Screens
+
+## 3.0 Global Navigation
+
+### Purpose
+
+Provide a simple top menu so reviewers can move between the dashboard and the manual test flow without changing URLs manually.
+
+### Main items
+
+- Dashboard
+- Add Test Order
+
+### UX rule
+
+The active page should be clearly highlighted and the navigation should stay visible across both primary portfolio screens.
 
 ## 3.1 Dashboard Screen
 
@@ -37,6 +53,7 @@ Main screen for business metrics and insights.
 - filter bar
 - KPI cards
 - revenue trend chart
+- revenue trend grouping selector
 - top products chart
 - revenue by region chart
 - revenue by channel chart
@@ -50,9 +67,11 @@ Main screen for business metrics and insights.
 - filter by region
 - filter by channel
 - filter by category
+- switch the revenue trend between day, week, month, and year grouping
 - reset filters
 - inspect latest ingestion run
 - view recent orders
+- open the Add Test Order page
 
 ### Data loaded from API
 
@@ -62,9 +81,37 @@ Main screen for business metrics and insights.
 - `/metrics/revenue-by-region`
 - `/metrics/revenue-by-channel`
 - `/orders`
-- `/ingestion/runs/latest`
+- `/ingestion/runs/latest` with latest status, rejected counts, and recent issue summary
 
-## 3.2 Project Case Study Section
+## 3.2 Manual Order Entry Screen
+
+### Purpose
+
+Let a reviewer create one new order through the UI and push it through the same ingestion and transformation flow used by the dataset pipeline.
+
+### Main sections
+
+- top navigation
+- page introduction and usage guidance
+- manual order form
+- submission status card
+- created order summary
+- quality summary
+
+### Available actions
+
+- enter a new order payload
+- leave `source_record_id` blank for backend generation
+- submit the test order
+- reset the form
+- return to the dashboard
+- inspect ingestion or quality outcomes
+
+### Data loaded from API
+
+- `POST /orders`
+
+## 3.3 Project Case Study Section
 
 This may be part of the README or a simple page in the frontend.
 
@@ -89,7 +136,7 @@ Explain the project as a portfolio case study.
 - open API documentation
 - open live dashboard
 
-## 3.3 API Documentation Screen
+## 3.4 API Documentation Screen
 
 Optional for MVP if FastAPI Swagger is exposed.
 
@@ -110,6 +157,7 @@ Recommended layout:
 ```text
 +------------------------------------------------------+
 | Header: DataPulse BI                                 |
+| Nav: Dashboard | Add Test Order                      |
 | Subtitle: Lightweight data engineering dashboard     |
 +------------------------------------------------------+
 | Filters: date range | region | channel | category    |
@@ -120,7 +168,7 @@ Recommended layout:
 +------------------------------------------------------+
 | Top Products Chart       | Revenue by Region Chart   |
 +------------------------------------------------------+
-| Revenue by Channel Chart | Ingestion Status Panel    |
+| Revenue by Channel Chart | Ingestion + Quality Panel |
 +------------------------------------------------------+
 | Recent Orders Table                                  |
 +------------------------------------------------------+
@@ -133,6 +181,7 @@ Recommended layout:
 ### Content
 
 - project name
+- top navigation links
 - short description
 - optional GitHub link
 - optional API docs link
@@ -140,6 +189,7 @@ Recommended layout:
 ### UX rule
 
 The header must quickly explain what the dashboard does.
+It should also make moving to the manual order entry page obvious.
 
 ## 5.2 Filter Bar
 

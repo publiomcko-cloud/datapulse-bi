@@ -54,6 +54,7 @@ A business user opens the dashboard and can quickly answer:
 - Which regions or channels generated more revenue?
 - How are indicators changing over time?
 - Are there data quality issues in the imported dataset?
+- Can I add a test order and confirm that the metrics update end to end?
 
 ## 6. Functional Requirements
 
@@ -112,25 +113,32 @@ The backend must expose endpoints for dashboard metrics.
 Minimum endpoints:
 
 - healthcheck
-- ingestion status
+- ingestion status with latest-run quality summary
 - KPI summary
 - revenue over time
 - top products
 - revenue by region
 - revenue by channel
-- orders table with filters
+- `GET /orders` table with filters
+- `POST /orders` manual order submission for reviewer testing
 
 ### FR-006 — Dashboard
 
 The frontend must display:
 
+- a top navigation menu between product pages
 - KPI cards
 - trend charts
+- trend grouping controls for day, week, month, and year views
 - ranking charts
 - filters
 - table with recent records
 - ingestion status
 - data quality summary
+- a manual order entry page that runs a single record through ingestion and transformation
+
+The dashboard may source the data quality summary from the latest ingestion status response rather than a separate endpoint.
+When a newly selected date range spans more than one month, the revenue trend should default to weekly grouping until the user explicitly chooses another bucket.
 
 ### FR-007 — Filtering
 
@@ -153,6 +161,18 @@ The system must include minimum tests for:
 ### FR-009 — Documentation
 
 The repository must include documentation for setup, architecture, database modeling, scope, backlog, testing, deployment, and agent instructions.
+
+### FR-010 — Manual test order entry
+
+The product must provide a simple reviewer-facing page where a user can submit a new order without editing CSV files manually.
+
+The flow must:
+
+- accept a single order payload from the frontend
+- send it to the backend through `POST /orders`
+- run ingestion and transformation for that record
+- report success, partial success, or data quality rejection back to the user
+- make it easy to return to the dashboard and verify metric changes
 
 ## 7. Non-Functional Requirements
 

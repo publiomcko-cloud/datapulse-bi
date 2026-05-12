@@ -6,6 +6,14 @@ This document describes how DataPulse BI can be published in a remote environmen
 
 The first deployment should be simple, low-cost, and portfolio-friendly.
 
+Current repository deployment assets:
+
+- `backend/Dockerfile`
+- `frontend/Dockerfile`
+- `docker-compose.production.yml`
+- `render.yaml`
+- `backend/scripts/seed_demo_data.py`
+
 ## 2. Deployment Goals
 
 The deployment must provide:
@@ -52,14 +60,20 @@ Required environment variable:
 NEXT_PUBLIC_API_URL=https://your-backend-url
 ```
 
+Repository support:
+
+- `frontend/.env.local.example` documents the local override
+- `frontend/Dockerfile` accepts `NEXT_PUBLIC_API_URL` as a build argument
+- `frontend/next.config.ts` uses standalone output for container deployment
+
 Deployment steps:
 
 1. Push repository to GitHub.
 2. Import frontend project into Vercel.
 3. Set root directory to `frontend`.
-4. Add environment variables.
+4. Add `NEXT_PUBLIC_API_URL`.
 5. Deploy.
-6. Validate dashboard loads.
+6. Validate dashboard loads and requests the deployed backend.
 
 ## 5. Backend Deployment
 
@@ -75,6 +89,7 @@ Required environment variables:
 ```env
 DATABASE_URL=postgresql+psycopg://user:password@host:5432/database
 ENVIRONMENT=production
+CORS_ORIGINS=https://your-project.vercel.app
 ```
 
 Recommended production command:
@@ -84,6 +99,12 @@ uvicorn app.main:app --host 0.0.0.0 --port $PORT
 ```
 
 If the platform requires a start command, use its expected port variable.
+
+Repository support:
+
+- `render.yaml` defines a Render web service and managed PostgreSQL blueprint
+- `backend/Dockerfile` provides a container deployment option for platforms that prefer Docker
+- `backend/scripts/seed_demo_data.py` loads demo records after the service is live
 
 ## 6. Database Deployment
 
@@ -135,11 +156,12 @@ For a portfolio demo, the project should load safe demo data.
 Command example:
 
 ```bash
-python scripts/ingest_data.py
-python scripts/transform_data.py
+python scripts/seed_demo_data.py
 ```
 
 Do not use real private customer data in the public demo.
+
+This script already runs ingestion and transformation sequentially against `data/sample_orders.csv`.
 
 ## 10. Healthcheck
 
@@ -153,16 +175,9 @@ Expected response:
 
 ```json
 {
-  "status": "ok"
-}
-```
-
-Future version may include:
-
-```json
-{
   "status": "ok",
-  "database": "ok"
+  "database": "ok",
+  "environment": "production"
 }
 ```
 
@@ -197,7 +212,7 @@ After deployment, validate:
 ```env
 DATABASE_URL=
 ENVIRONMENT=production
-ALLOWED_ORIGINS=
+CORS_ORIGINS=
 ```
 
 ### Frontend
@@ -217,6 +232,11 @@ https://your-project.vercel.app
 ```
 
 Do not allow all origins in production unless it is intentional for a public demo.
+
+The backend currently accepts either:
+
+- a comma-separated string such as `https://app.example.com,https://preview.example.com`
+- a JSON array string such as `["https://app.example.com"]`
 
 ## 15. Deployment Risks
 
@@ -240,11 +260,39 @@ The dashboard may look empty if seed data is not loaded.
 
 Some hosting platforms sleep after inactivity. Mention this in README if relevant.
 
-## 16. Future Deployment Improvements
+## 16. Production-Like Local Validation
+
+The repository now includes a production-like local stack:
+
+```bash
+docker compose -p datapulse-bi-prod -f docker-compose.production.yml up -d --build
+docker exec datapulse_backend_prod alembic upgrade head
+docker exec datapulse_backend_prod python scripts/seed_demo_data.py
+curl http://localhost:8000/health
+curl http://localhost:8000/metrics/summary
+curl -H 'Origin: http://localhost:3000' http://localhost:8000/metrics/summary
+docker compose -p datapulse-bi-prod -f docker-compose.production.yml down
+```
+
+Validated locally on April 29, 2026:
+
+- backend container returned `{"status":"ok","database":"ok","environment":"production"}`
+- frontend container served the dashboard shell on `http://localhost:3000`
+- demo data seeded successfully inside the backend container
+- backend CORS allowed `http://localhost:3000`
+
+## 17. Current Deployment Status
+
+- production configuration files are present and validated locally
+- live frontend URL is not published yet
+- live backend URL is not published yet
+- live API docs URL is not published yet
+- final hosted validation still depends on real Vercel and Render deployment access
+
+## 18. Future Deployment Improvements
 
 Future versions may add:
 
-- Dockerized backend deployment
 - GitHub Actions CI/CD
 - scheduled ingestion jobs
 - monitoring
@@ -253,7 +301,7 @@ Future versions may add:
 - preview deployments
 - production database backups
 
-## 17. Deployment Acceptance Criteria
+## 19. Deployment Acceptance Criteria
 
 The deployment is acceptable when:
 

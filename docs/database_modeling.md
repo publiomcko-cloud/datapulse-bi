@@ -48,6 +48,12 @@ dim_products
 ingestion_runs
 ```
 
+Current implementation choice:
+
+- milestone 2 uses table prefixes in the default `public` schema
+- the initial schema is managed by Alembic revision `20260429_0001`
+- milestone 4 uses `transform_orders` runs in `ingestion_runs` to track staging and analytics loads
+
 ## 4. Main Entities
 
 ## 4.1 ingestion_runs
@@ -269,9 +275,13 @@ To support dashboard queries.
 - facts should reference dimensions
 - duplicate source records should not create duplicate facts
 
-## 5. Optional Entity: data_quality_issues
+## 5. data_quality_issues
 
 Stores validation problems.
+
+### Purpose
+
+To support dashboard data quality summaries and preserve row-level validation evidence for rejected records.
 
 ### Suggested fields
 
@@ -285,6 +295,12 @@ Stores validation problems.
 | original_value | TEXT | Nullable |
 | message | TEXT | Required |
 | created_at | TIMESTAMP | Default now |
+
+### Business rules
+
+- the MVP should create a quality issue record when a row is rejected during validation or transformation
+- issue records should be attributable to an ingestion or transformation run
+- the latest ingestion status can aggregate these records into a compact dashboard summary
 
 ## 6. Enums
 

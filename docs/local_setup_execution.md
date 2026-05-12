@@ -166,9 +166,17 @@ POSTGRES_PASSWORD=datapulse
 POSTGRES_DB=datapulse
 DATABASE_URL=postgresql+psycopg://datapulse:datapulse@localhost:5432/datapulse
 ENVIRONMENT=local
+CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 
-Add the same values to `.env` for local development.
+Add the backend values to `.env` for local development.
+
+If you want to override the frontend API base URL explicitly, create `frontend/.env.local` with:
+
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
 
 ## 8. Create Backend Environment
 
@@ -210,153 +218,213 @@ Install dependencies:
 pip install -r requirements.txt
 ```
 
-## 9. Create Backend Structure
+## 9. Use the Existing Backend Structure
+
+The repository already includes the milestone 2 backend foundation:
+
+- `backend/app/core/config.py`
+- `backend/app/db/session.py`
+- `backend/app/models/`
+- `backend/alembic.ini`
+- `backend/alembic/env.py`
+- `backend/alembic/versions/20260429_0001_create_core_tables.py`
+- `backend/scripts/check_db_connection.py`
+
+## 10. Run Migrations and Verify the Database
 
 From `backend/`:
 
 ```bash
-mkdir -p app/api app/core app/db app/models app/schemas app/services scripts tests
-touch app/__init__.py
-touch app/main.py
-touch app/api/__init__.py
-touch app/core/__init__.py
-touch app/db/__init__.py
-touch app/models/__init__.py
-touch app/schemas/__init__.py
-touch app/services/__init__.py
+alembic upgrade head
+python scripts/check_db_connection.py
 ```
 
-Create a temporary FastAPI app:
+Expected validation:
+
+- Alembic applies revision `20260429_0001`
+- the connection check prints the database name, current user, and `healthcheck= 1`
+- the local PostgreSQL instance contains:
+  `ingestion_runs`, `raw_orders`, `stg_orders`, `dim_products`, `dim_customers`, `dim_regions`, `dim_channels`, `fact_orders`, and `data_quality_issues`
+
+Optional table inspection:
 
 ```bash
-cat > app/main.py <<'EOF'
-from fastapi import FastAPI
-
-app = FastAPI(title="DataPulse BI API")
-
-@app.get("/health")
-def healthcheck():
-    return {"status": "ok"}
-EOF
+cd ~/projects/datapulse-bi
+docker exec datapulse_postgres psql -U datapulse -d datapulse -c "\dt"
 ```
 
-Run backend:
+## 11. Run the Backend App
+
+From `backend/`:
 
 ```bash
+source .venv/bin/activate
 uvicorn app.main:app --reload
 ```
 
 Expected validation:
 
-Open:
+- Uvicorn starts without import or database configuration errors
+- FastAPI serves the application shell on `http://localhost:8000`
+- `GET /health` returns `{"status":"ok","database":"ok","environment":"local"}`
 
-```text
-http://localhost:8000/health
-```
+## 12. Frontend Status
 
-Expected response:
+The frontend is implemented for milestone 6 and extended in milestone 9 with a manual order testing flow.
 
-```json
-{"status":"ok"}
-```
+Current frontend stack:
 
-## 10. Configure Alembic
-
-From `backend/`:
-
-```bash
-alembic init alembic
-```
-
-Later, configure `alembic.ini` and `env.py` to read `DATABASE_URL`.
-
-Initial migration commands after models exist:
-
-```bash
-alembic revision --autogenerate -m "create initial tables"
-alembic upgrade head
-```
-
-## 11. Create Frontend
-
-From project root:
-
-```bash
-cd ~/projects/datapulse-bi
-npx create-next-app@latest frontend
-```
-
-Recommended answers:
-
-```text
-TypeScript: Yes
-ESLint: Yes
-Tailwind CSS: Yes
-src directory: Yes
-App Router: Yes
-Turbopack: Yes
-Import alias: Yes
-```
+- Next.js App Router
+- TypeScript
+- Tailwind CSS
+- TanStack Query
+- Recharts
 
 Run frontend:
 
 ```bash
-cd frontend
+cd ~/projects/datapulse-bi/frontend
+npm install
 npm run dev
 ```
 
 Expected validation:
 
-Open:
+- the dashboard loads on `http://localhost:3000`
+- the manual order page loads on `http://localhost:3000/orders/new`
+- the frontend uses `http://localhost:8000` by default or reads `NEXT_PUBLIC_API_URL` from `frontend/.env.local`
+- the backend allows local browser requests through `CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000`
+- KPI cards, charts, recent orders, and the latest ingestion status panel render after the backend is available
+- the top navigation links the dashboard and the manual order testing page
 
-```text
-http://localhost:3000
-```
+## 13. Ingestion and Transformation Status
 
-## 12. Create Frontend Environment File
+The ingestion script is implemented for milestone 3.
 
-From `frontend/`:
+Current dataset:
 
-```bash
-cat > .env.local <<'EOF'
-NEXT_PUBLIC_API_URL=http://localhost:8000
-EOF
-```
+- `data/sample_orders.csv`
+- 12 deterministic synthetic sales orders
+- intended for repeatable local ingestion and duplicate detection checks
 
-## 13. Run Data Pipeline
-
-After scripts are implemented, run:
+Run ingestion:
 
 ```bash
 cd ~/projects/datapulse-bi/backend
 source .venv/bin/activate
 python scripts/ingest_data.py
+```
+
+Generate a larger random dataset when you want to stress-test the dashboard with more records:
+
+```bash
+cd ~/projects/datapulse-bi/backend
+source .venv/bin/activate
+python scripts/generate_random_orders.py --count 1000
+python scripts/ingest_data.py --csv-path ../data/generated_orders_1000.csv --source-name random_orders_1000
 python scripts/transform_data.py
 ```
 
-Expected validation:
+Expected validation for the first run:
 
-- raw table contains records
-- staging table contains cleaned records
-- fact table contains analytical records
-- ingestion run table contains execution logs
+- `records_read= 12`
+- `records_inserted= 12`
+- `records_rejected= 0`
+- one `ingestion_runs` row with status `success`
 
-## 14. Run Tests
+Expected validation for a second run against the same dataset:
+
+- `records_read= 12`
+- `records_inserted= 0`
+- `records_rejected= 12`
+- one additional `ingestion_runs` row with status `partial`
+- `data_quality_issues` records created with `duplicate_record`
+
+Transformation is implemented for milestone 4.
+
+Run transformation:
+
+```bash
+cd ~/projects/datapulse-bi/backend
+source .venv/bin/activate
+python scripts/transform_data.py
+```
+
+Expected validation for a clean dataset load:
+
+- `records_read= 12`
+- `records_inserted= 12`
+- `records_rejected= 0`
+- one `transform_orders` row in `ingestion_runs` with status `success`
+- `stg_orders` contains normalized records
+- `fact_orders` contains analytical order facts
+- `dim_products`, `dim_customers`, `dim_regions`, and `dim_channels` are populated
+
+## 14. Run Validation Commands
 
 Backend tests:
 
 ```bash
 cd ~/projects/datapulse-bi/backend
 source .venv/bin/activate
+python -m compileall app scripts
 pytest
 ```
+
+Current expectation:
+
+- `compileall` succeeds
+- `pytest` passes the current milestone 2 through milestone 7 checks
+- backend test suite currently reports `16 passed`
+
+Backend smoke command:
+
+```bash
+cd ~/projects/datapulse-bi/backend
+source .venv/bin/activate
+python scripts/run_smoke_checks.py
+```
+
+Current expectation:
+
+- the script prints `health_status= ok`
+- the script runs a fresh ingestion and transformation from `data/sample_orders.csv`
+- the script validates `/ingestion/runs/latest`, `/metrics/summary`, and `/orders`
+- the script ends with `smoke_status= ok`
+
+Optional production-like validation:
+
+```bash
+cd ~/projects/datapulse-bi
+docker compose -p datapulse-bi-prod -f docker-compose.production.yml up -d --build
+docker exec datapulse_backend_prod alembic upgrade head
+docker exec datapulse_backend_prod python scripts/seed_demo_data.py
+curl http://localhost:8000/health
+curl http://localhost:8000/metrics/summary
+docker compose -p datapulse-bi-prod -f docker-compose.production.yml down
+```
+
+Current expectation:
+
+- the stack builds both `backend/Dockerfile` and `frontend/Dockerfile`
+- PostgreSQL runs on host port `5433` inside the production-like stack
+- backend runs on `http://localhost:8000`
+- frontend runs on `http://localhost:3000`
+- healthcheck reports `environment":"production"`
+- summary metrics return the seeded sample values
 
 Frontend validation:
 
 ```bash
 cd ~/projects/datapulse-bi/frontend
 npm run lint
+npm run build
 ```
+
+Current expectation:
+
+- `npm run lint` succeeds
+- `npm run build` succeeds
 
 ## 15. Commit Project
 
@@ -376,9 +444,14 @@ git commit -m "Initial documentation and project structure"
 - [ ] Docker Compose configured
 - [ ] PostgreSQL running
 - [ ] Backend virtual environment created
-- [ ] FastAPI healthcheck working
-- [ ] Frontend created
-- [ ] Frontend running
+- [ ] Backend dependencies installed
+- [ ] Alembic migration applied
+- [ ] Database connectivity validated
+- [ ] Sample dataset ingested successfully
+- [ ] Ingestion run recorded in PostgreSQL
+- [ ] Transformation run recorded in PostgreSQL
+- [ ] Staging and fact tables populated
+- [ ] Backend app starts without import errors
 - [ ] Environment files configured
 - [ ] Documentation added
 - [ ] Initial commit created
@@ -397,14 +470,22 @@ Terminal 2:
 ```bash
 cd ~/projects/datapulse-bi/backend
 source .venv/bin/activate
+python scripts/check_db_connection.py
 uvicorn app.main:app --reload
 ```
 
-Terminal 3:
+Run `alembic upgrade head` after pulling schema changes or resetting the local database.
+
+Run `python scripts/ingest_data.py` when you want to load the sample dataset into an empty or reset local database.
+Run `python scripts/transform_data.py` after ingestion when you want to populate the analytical tables.
+
+Useful API checks after the backend starts:
 
 ```bash
-cd ~/projects/datapulse-bi/frontend
-npm run dev
+curl http://localhost:8000/health
+curl http://localhost:8000/ingestion/runs/latest
+curl http://localhost:8000/metrics/summary
+curl "http://localhost:8000/orders?limit=5&offset=0"
 ```
 
 ## 18. Daily Shutdown

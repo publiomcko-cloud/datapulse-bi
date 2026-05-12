@@ -20,6 +20,7 @@ If ingestion, transformation, or metric calculation is wrong, the dashboard beco
 
 The MVP must include tests for:
 
+- ingestion behavior
 - data validation
 - transformation logic
 - revenue calculation
@@ -48,6 +49,8 @@ Used to test components together.
 
 Examples:
 
+- CSV ingestion records run metadata correctly
+- duplicate raw rows create rejections and data quality issues
 - API endpoint reads from database
 - metric service returns correct summary
 - transformation inserts expected records
@@ -105,10 +108,12 @@ Test that:
 
 ```text
 backend/tests/
-├── test_health.py
-├── test_validation.py
+├── test_foundation.py
+├── test_ingestion.py
+├── test_api.py
 ├── test_transformation.py
 ├── test_metrics.py
+├── test_smoke.py
 └── conftest.py
 ```
 
@@ -171,11 +176,26 @@ source .venv/bin/activate
 pytest
 ```
 
+Backend smoke command:
+
+```bash
+cd backend
+source .venv/bin/activate
+python scripts/run_smoke_checks.py
+```
+
 Frontend lint:
 
 ```bash
 cd frontend
 npm run lint
+```
+
+Frontend production build:
+
+```bash
+cd frontend
+npm run build
 ```
 
 ## 9. Minimum Validation Criteria
@@ -188,6 +208,8 @@ The MVP should not be considered ready unless:
 - one metric endpoint test passes
 - no secrets are committed
 - dashboard can load data from the backend
+- frontend lint succeeds
+- frontend production build succeeds
 
 ## 10. Test Data Strategy
 
@@ -202,6 +224,26 @@ Example:
 ```
 
 This allows predictable assertions.
+
+Current implemented tests already cover:
+
+- backend foundation configuration
+- metadata registration of the milestone 2 tables
+- stable row hash generation for ingestion
+- successful raw ingestion into PostgreSQL
+- duplicate rejection with `data_quality_issues` creation
+- transformation helper normalization and parsing behavior
+- successful transformation into staging, dimensions, and fact tables
+- invalid raw rows rejected during transformation with `data_quality_issues`
+- API endpoint responses for health, ingestion status, metrics, and orders
+- metric service summaries, breakdowns, filters, and ordering rules
+- end-to-end smoke validation across health, ingestion, transformation, and API reads
+- frontend static analysis with `npm run lint`
+- frontend compilation with `npm run build`
+- `/health` API validation
+- `/ingestion/runs/latest` API validation with quality summary
+- `/metrics/summary` API validation
+- `/orders` API validation with filters
 
 ## 11. What Not to Test in MVP
 

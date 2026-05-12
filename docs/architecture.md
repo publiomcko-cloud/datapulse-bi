@@ -148,6 +148,7 @@ datapulse-bi/
 ├── backend/
 │   ├── requirements.txt
 │   ├── alembic.ini
+│   ├── alembic/
 │   ├── app/
 │   │   ├── main.py
 │   │   ├── api/
@@ -157,6 +158,7 @@ datapulse-bi/
 │   │   ├── schemas/
 │   │   └── services/
 │   ├── scripts/
+│   │   ├── check_db_connection.py
 │   │   ├── ingest_data.py
 │   │   └── transform_data.py
 │   └── tests/
@@ -185,11 +187,15 @@ backend/app/
 │   ├── dim_customer.py
 │   └── ingestion_run.py
 ├── schemas/
+│   ├── health.py
+│   ├── ingestion.py
 │   ├── metrics.py
-│   └── ingestion.py
+│   └── orders.py
 └── services/
+    ├── ingestion_service.py
+    ├── ingestion_status_service.py
     ├── metrics_service.py
-    └── ingestion_status_service.py
+    └── transformation_service.py
 ```
 
 ## 7. Database Layering Strategy
@@ -243,6 +249,8 @@ GET /ingestion/runs/latest
 
 Returns ingestion execution history.
 
+`/ingestion/runs/latest` should also provide the latest run status, rejected counts, and a compact data quality summary for the dashboard.
+
 ### Metrics
 
 ```http
@@ -252,6 +260,7 @@ GET /metrics/top-products
 GET /metrics/revenue-by-region
 GET /metrics/revenue-by-channel
 GET /orders
+POST /orders
 ```
 
 Common query parameters:
@@ -271,14 +280,17 @@ offset
 ```text
 Dashboard Layout
 ├── Header
+├── Top Navigation
 ├── Filter Bar
 ├── KPI Cards
 ├── Revenue Trend Chart
-├── Revenue by Category Chart
 ├── Top Products Chart
 ├── Revenue by Region Chart
+├── Revenue by Channel Chart
 ├── Orders Table
-└── Ingestion Status Panel
+├── Ingestion Status Panel
+├── Data Quality Summary
+└── Manual Order Entry Page
 ```
 
 ## 10. Authentication Flow
@@ -305,6 +317,7 @@ For now, the dashboard should use public demo data only.
 6. Backend reads analytics tables.
 7. Frontend calls backend endpoints.
 8. User views dashboard and filters data.
+9. Reviewer may submit a manual order through `POST /orders` and return to the dashboard to confirm metric changes.
 
 ## 12. Technical Decisions and Justifications
 
@@ -337,6 +350,7 @@ Minimum observability:
 - transformation logs
 - healthcheck endpoint
 - ingestion run table
+- data quality issue records for rejected inputs
 
 Recommended log fields:
 
